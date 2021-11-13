@@ -9,7 +9,7 @@ import { extname } from 'path';
 
 const args = process.argv;
 const jsonFilename = args[2];
-assert(jsonFilename?.length > 0 && extname(jsonFilename.endsWith('json')), 'Please provide a path to a JSON file');
+assert(jsonFilename?.length > 0 && extname(jsonFilename).endsWith('json'), 'Please provide a path to a JSON file');
 
 await pipeline(
     createReadStream(jsonFilename, { encoding: 'utf8' }),
