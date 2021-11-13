@@ -1,14 +1,15 @@
 import { default as assert } from 'assert/strict';
-import { createReadStream, createWriteStream } from 'fs';
+import { createReadStream } from 'fs';
 import EventStream from 'event-stream';
 const { map } = EventStream;
 import reduce from 'stream-reduce';
 import { parse, stringify } from 'JSONStream';
 import { pipeline } from 'stream/promises';
+import { extname } from 'path';
 
 const args = process.argv;
 const jsonFilename = args[2];
-assert(jsonFilename?.length > 0 && jsonFilename.endsWith('json'), 'Please provide a path to a JSON file');
+assert(jsonFilename?.length > 0 && extname(jsonFilename.endsWith('json')), 'Please provide a path to a JSON file');
 
 await pipeline(
     createReadStream(jsonFilename, { encoding: 'utf8' }),
@@ -47,7 +48,7 @@ await pipeline(
             callback(error);
         }
     }),
-    reduce((featureCollection, feature) => {
+    reduce(function (featureCollection, feature) {
         featureCollection.features.push(feature);
         return featureCollection;
     }, { type: "FeatureCollection", features: [] }),
