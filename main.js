@@ -1,74 +1,74 @@
-import './style.css';
-import { create, zoom as d3Zoom, zoomIdentity } from 'd3';
-import { geoMercator, geoPath } from 'd3-geo';
-import { json } from 'd3-fetch';
-// import { tile as d3Tile } from 'd3-tile';
-const jsonUrl = new URL('./test.json', import.meta.url).href;
+import "./style.css";
+import { create, zoomIdentity, easeLinear } from "d3";
+import { geoMercator, geoPath, geoCentroid } from "d3-geo";
+import { json } from "d3-fetch";
+const jsonUrl = new URL("./test.json", import.meta.url).href;
 
-// const url = (x, y, z) => `https://api.mapbox.com/styles/v1/mapbox/streets-v11/tiles/${z}/${x}/${y}${devicePixelRatio > 1 ? "@2x" : ""}?access_token=pk.eyJ1IjoibWJvc3RvY2siLCJhIjoiY2s5ZWRlbTM4MDE0eDNocWJ2aXR2amNmeiJ9.LEyjnNDr_BrxRmI4UDyJAQ`;
 const width = 600;
 const height = 600;
-const initialCenter = [-122.4687339913859, 37.764935808126985];
 const initialScale = 1 << 22;
 
 async function render() {
-    const featureCollection = await json(jsonUrl);
+  const featureCollection = await json(jsonUrl);
 
-    const svg = create("svg")
-        .attr("viewBox", [0, 0, width, height]);
+  const initialCenter = geoCentroid(featureCollection);
 
-    const projection = geoMercator()
-        .scale(1 / (2 * Math.PI))
-        .translate([0, 0]);
+  const svg = create("svg").attr("viewBox", [0, 0, width, height]);
 
-    const render = geoPath(projection);
+  const projection = geoMercator()
+    .scale(1 / (2 * Math.PI))
+    .translate([0, 0]);
 
-    // const tile = d3Tile()
-    //     .extent([[0, 0], [width, height]])
-    //     .tileSize(512);
+  const render = geoPath(projection);
 
-    const zoom = d3Zoom()
-        .scaleExtent([1 << 16, 1 << 32])
-        .extent([[0, 0], [width, height]])
-        .on("zoom", ({ transform }) => zoomed(transform));
+  const transform = zoomIdentity
+    .translate(width / 2, height / 2)
+    .scale(-initialScale)
+    .translate(...projection(initialCenter))
+    .scale(-1);
 
-    // let image = svg.append("g")
-    //     .attr("pointer-events", "none")
-    //     .selectAll("image");
+  projection
+    .scale(transform.k / (2 * Math.PI))
+    .translate([transform.x, transform.y]);
 
-    const path = svg.append("path")
-        .attr("pointer-events", "none")
-        .attr("fill", "none")
-        .attr("stroke", "red")
-        .attr("stroke-linecap", "round")
-        .attr("stroke-linejoin", "round");
+  const path = svg
+    .selectAll("path")
+    .data(featureCollection.features, (feature) => feature)
+    .join(
+      (enter) =>
+        enter
+          .append("path")
+          .attr("pointer-events", "none")
+          .attr("fill", "none")
+          .attr("stroke", "red")
+          .attr("stroke-linecap", "round")
+          .attr("stroke-linejoin", "round")
+          .attr("d", (feature) => render(feature))
+          .each(function (d) {
+            d.properties.totalLength = this.getTotalLength();
+          }),
+      (update) => update,
+      (exit) => exit.remove()
+    );
 
-    svg
-        .call(zoom)
-        .call(zoom.transform, zoomIdentity
-            .translate(width / 2, height / 2)
-            .scale(-initialScale)
-            .translate(...projection(initialCenter))
-            .scale(-1));
+  // data is created inside the function so it is always unique
+  function repeat() {
+    path
+      .attr(
+        "stroke-dasharray",
+        (feature) =>
+          `${feature.properties.totalLength} ${feature.properties.totalLength}`
+      )
+      .attr("stroke-dashoffset", (feature) => feature.properties.totalLength)
+      .transition()
+      .duration(4000)
+      .ease(easeLinear)
+      .attr("stroke-dashoffset", 0)
+      .on("end", repeat);
+  }
+  repeat();
 
-    function zoomed(transform) {
-        // const tiles = tile(transform);
-
-        // image = image.data(tiles, d => d).join("image")
-        //     // .attr("xlink:href", d => url(...d))
-        //     .attr("x", ([x]) => (x + tiles.translate[0]) * tiles.scale)
-        //     .attr("y", ([, y]) => (y + tiles.translate[1]) * tiles.scale)
-        //     .attr("width", tiles.scale)
-        //     .attr("height", tiles.scale);
-
-        projection
-            .scale(transform.k / (2 * Math.PI))
-            .translate([transform.x, transform.y]);
-
-        path.attr("d", render(featureCollection));
-    }
-
-    document.body.appendChild(svg.node());
+  document.body.appendChild(svg.node());
 }
 
 render().catch(console.error);
