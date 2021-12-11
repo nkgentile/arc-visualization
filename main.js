@@ -6,12 +6,12 @@ const jsonUrl = new URL("./test.json", import.meta.url).href;
 
 const width = 600;
 const height = 600;
-const initialScale = 1 << 22;
+const initialScale = 1 << 21;
 
 async function render() {
   const featureCollection = await json(jsonUrl);
 
-  const initialCenter = geoCentroid(featureCollection);
+  const initialCenter = geoCentroid(featureCollection.features[0]);
 
   const svg = create("svg").attr("viewBox", [0, 0, width, height]);
 
@@ -30,6 +30,7 @@ async function render() {
   projection
     .scale(transform.k / (2 * Math.PI))
     .translate([transform.x, transform.y]);
+
 
   const path = svg
     .selectAll("path")
@@ -51,7 +52,6 @@ async function render() {
       (exit) => exit.remove()
     );
 
-  // data is created inside the function so it is always unique
   function repeat() {
     path
       .attr(
@@ -61,7 +61,7 @@ async function render() {
       )
       .attr("stroke-dashoffset", (feature) => feature.properties.totalLength)
       .transition()
-      .duration(4000)
+      .duration(10000)
       .ease(easeLinear)
       .attr("stroke-dashoffset", 0)
       .on("end", repeat);

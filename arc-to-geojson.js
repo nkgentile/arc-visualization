@@ -1,6 +1,7 @@
 import { default as assert } from "assert/strict";
 import { createReadStream } from "fs";
 import EventStream from "event-stream";
+import StreamConcat from "stream-concat";
 const { map } = EventStream;
 import reduce from "stream-reduce";
 import { parse, stringify } from "JSONStream";
@@ -8,19 +9,20 @@ import { pipeline } from "stream/promises";
 import { extname } from "path";
 
 const args = process.argv;
-const jsonFilename = args[2];
+const jsonFilenames = args.splice(2);
 assert(
-  jsonFilename?.length > 0 && extname(jsonFilename).endsWith("json"),
+  jsonFilenames.every(
+    (filename) => filename?.length > 0 && extname(filename).endsWith("json")
+  ),
   "Please provide a path to a JSON file"
 );
 
-await pipeline(
-  createReadStream(jsonFilename, { encoding: "utf8" }),
+const parseTimelineItems = [
   parse("timelineItems.*"),
   map(function (item, callback) {
     try {
       if (
-        item.activityType != "walking" ||
+        (item.activityType && item.activityType != "walking") ||
         !Array.isArray(item?.samples) ||
         item?.samples?.length === 0
       ) {
@@ -62,8 +64,19 @@ await pipeline(
       callback(error);
     }
   }),
+];
+
+const collection = new StreamConcat(
+  jsonFilenames.map((filename) =>
+    createReadStream(filename, { encoding: "utf8" })
+  )
+);
+
+await pipeline(
+  collection,
+  ...parseTimelineItems,
   reduce(
-    function (featureCollection, feature) {
+    (featureCollection, feature) => {
       featureCollection.features.push(feature);
       return featureCollection;
     },
